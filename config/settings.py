@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 # ========================
 # GENERAL
@@ -7,32 +8,42 @@ APP_NAME = "DubYou"
 ENV = os.getenv("ENV", "dev")
 
 # ========================
-# POSTGRES
+# POSTGRES (NeonDB)
 # ========================
-POSTGRES = {
-    "host": os.getenv("POSTGRES_HOST", "localhost"),
-    "port": int(os.getenv("POSTGRES_PORT", 5432)),
-    "db": os.getenv("POSTGRES_DB", "dubyou"),
-    "user": os.getenv("POSTGRES_USER", "postgres"),
-    "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
-}
+NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL")
+
+if NEON_DATABASE_URL:
+    parsed = urlparse(NEON_DATABASE_URL)
+    POSTGRES = {
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "db": parsed.path.lstrip("/"),
+        "user": parsed.username,
+        "password": parsed.password,
+        "sslmode": "require",
+    }
+else:
+    POSTGRES = {}
 
 # ========================
-# REDIS
+# REDIS (Redis Cloud)
 # ========================
 REDIS = {
-    "host": os.getenv("REDIS_HOST", "localhost"),
+    "host": os.getenv("REDIS_HOST"),
     "port": int(os.getenv("REDIS_PORT", 6379)),
+    "username": os.getenv("REDIS_USERNAME", "default"),
+    "password": os.getenv("REDIS_PASSWORD"),
     "db": 0,
+    "ssl": True,
 }
 
 # ========================
-# QDRANT
+# QDRANT (Cloud)
 # ========================
 QDRANT = {
-    "host": os.getenv("QDRANT_HOST", "localhost"),
-    "port": int(os.getenv("QDRANT_PORT", 6333)),
-    "collection": "voice_embeddings",
+    "url": os.getenv("QDRANT_URL"),
+    "api_key": os.getenv("QDRANT_API_KEY"),
+    "collection": os.getenv("QDRANT_COLLECTION", "voice_embeddings"),
 }
 
 # ========================
