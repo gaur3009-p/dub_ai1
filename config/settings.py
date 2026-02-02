@@ -36,8 +36,33 @@ QDRANT = {
 }
 
 # ========================
-# MODELS
+# ASR (Whisper)
 # ========================
 WHISPER_MODEL = "base"
+
+SUPPORTED_ASR_LANGS = {
+    "english": "en",
+    "hindi": "hi",
+}
+
+# ========================
+# NLLB TRANSLATION
+# ========================
 NLLB_MODEL = "facebook/nllb-200-distilled-600M"
-TTS_MODEL = "tts_models/en/ljspeech/tacotron2-DDC"
+
+NLLB_LANG_MAP = {
+    "english": "eng_Latn",
+    "hindi": "hin_Deva",
+}
+
+# ========================
+# MMS – MULTILINGUAL TTS
+# ========================
+MMS_TTS_BASE = "facebook/mms-tts"
+
+MMS_TTS_LANGUAGES = {
+    "english": "eng",
+    "hindi": "hin",
+}
+
+DEFAULT_TTS_LANG = "eng"
