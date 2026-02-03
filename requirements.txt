@@ -1,39 +1,12 @@
-# ========================
-# Core app & UI
-# ========================
 gradio
-
-# ========================
-# ASR (Whisper)
-# ========================
-openai-whisper
 torch
-
-# ========================
-# Translation (NLLB)
-# ========================
+openai-whisper
 transformers
 sentencepiece
-
-# ========================
-# MMS TTS (Hugging Face)
-# ========================
 soundfile
-
-# ========================
-# Audio processing
-# ========================
 librosa
 numpy
-
-# ========================
-# Databases
-# ========================
 psycopg2-binary
 redis
 qdrant-client
-
-# ========================
-# Env handling (recommended)
-# ========================
 python-dotenv
