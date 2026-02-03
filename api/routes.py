@@ -13,27 +13,17 @@ translator = NLLBTranslator(NLLB_MODEL)
 tts = VoiceSynthesizer()
 
 def process_audio(audio_path: str, spoken_language: str):
-    """
-    spoken_language: 'english' or 'hindi'
-    """
-
-    # 1️⃣ ASR
     asr_lang = SUPPORTED_ASR_LANGS[spoken_language]
     text = asr.transcribe(audio_path, asr_lang)
 
-    # 2️⃣ Translation direction
     if spoken_language == "english":
-        src_lang = NLLB_LANG_MAP["english"]
-        tgt_lang = NLLB_LANG_MAP["hindi"]
+        src, tgt = NLLB_LANG_MAP["english"], NLLB_LANG_MAP["hindi"]
         tts_lang = MMS_TTS_LANGUAGES["hindi"]
     else:
-        src_lang = NLLB_LANG_MAP["hindi"]
-        tgt_lang = NLLB_LANG_MAP["english"]
+        src, tgt = NLLB_LANG_MAP["hindi"], NLLB_LANG_MAP["english"]
         tts_lang = MMS_TTS_LANGUAGES["english"]
 
-    translated = translator.translate(text, src_lang, tgt_lang)
+    translated = translator.translate(text, src, tgt)
+    audio_out = tts.synthesize(translated, tts_lang)
 
-    # 3️⃣ TTS
-    output_audio = tts.synthesize(translated, tts_lang)
-
-    return text, translated, output_audio
+    return text, translated, audio_out
