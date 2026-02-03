@@ -7,13 +7,11 @@ def pipeline(audio_path, spoken_language):
     return process_audio(audio_path, spoken_language)
 
 with gr.Blocks(title="DubYou – English ⇄ Hindi AI Dubbing") as app:
-    gr.Markdown(
-        """
-        # 🎙️ DubYou  
-        **English ⇄ Hindi AI Dubbing**  
-        Whisper → NLLB → MMS-TTS (Python 3.12 Safe)
-        """
-    )
+    gr.Markdown("""
+    # 🎙️ DubYou  
+    **English ⇄ Hindi AI Dubbing**  
+    Whisper → NLLB → MMS-TTS
+    """)
 
     audio = gr.Audio(
         sources=["microphone", "upload"],
@@ -40,4 +38,4 @@ with gr.Blocks(title="DubYou – English ⇄ Hindi AI Dubbing") as app:
     )
 
 if __name__ == "__main__":
-    app.launch(server_name="0.0.0.0", server_port=7860)
+    app.launch()=
