@@ -7,6 +7,3 @@ qdrant_client = QdrantClient(
 )
 
 COLLECTION_NAME = QDRANT["collection"]
-
-def get_collections():
-    return qdrant_client.get_collections()
