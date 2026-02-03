@@ -12,6 +12,9 @@ ENV = os.getenv("ENV", "dev")
 # ========================
 NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL")
 
+POSTGRES_ENABLED = False
+POSTGRES = {}
+
 if NEON_DATABASE_URL:
     parsed = urlparse(NEON_DATABASE_URL)
     POSTGRES = {
@@ -22,8 +25,7 @@ if NEON_DATABASE_URL:
         "password": parsed.password,
         "sslmode": "require",
     }
-else:
-    POSTGRES = {}
+    POSTGRES_ENABLED = True
 
 # ========================
 # REDIS (Redis Cloud)
