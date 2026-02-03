@@ -7,6 +7,8 @@ from config.settings import (
     MMS_TTS_LANGUAGES,
     NLLB_MODEL
 )
+from services.voice_identity.voice_storage import store_voice
+from services.database.conversation_repo import save_conversation
 
 asr = WhisperASR()
 translator = NLLBTranslator(NLLB_MODEL)
@@ -30,13 +32,14 @@ def process_audio(audio_path: str, spoken_language: str):
         tgt_lang = NLLB_LANG_MAP["english"]
         tts_lang = MMS_TTS_LANGUAGES["english"]
 
-    # 3️⃣ TRANSLATION (this was broken earlier)
     translated = translator.translate(text, src_lang, tgt_lang)
-
-    if not translated or not translated.strip():
-        raise ValueError("Translation returned empty text")
-
-    # 4️⃣ TTS (NOT voice cloning – generic voice)
     audio_out = tts.synthesize(translated, tts_lang)
+
+    save_conversation(spoken_language, text, translated)
+    store_voice(
+        audio_path=audio_path,
+        speaker="aditya",      
+        language=spoken_language
+    )
 
     return text, translated, audio_out
