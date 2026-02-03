@@ -9,6 +9,7 @@ class PostgresClient:
             database=POSTGRES["db"],
             user=POSTGRES["user"],
             password=POSTGRES["password"],
+            sslmode=POSTGRES.get("sslmode", "require"),
         )
         self.conn.autocommit = True
 
