@@ -15,14 +15,12 @@ translator = NLLBTranslator(NLLB_MODEL)
 tts = VoiceSynthesizer()
 
 def process_audio(audio_path: str, spoken_language: str):
-    # 1️⃣ ASR
     asr_lang = SUPPORTED_ASR_LANGS[spoken_language]
     text = asr.transcribe(audio_path, asr_lang)
 
     if not text or not text.strip():
         raise ValueError("ASR returned empty text")
 
-    # 2️⃣ Decide translation direction
     if spoken_language == "english":
         src_lang = NLLB_LANG_MAP["english"]
         tgt_lang = NLLB_LANG_MAP["hindi"]
@@ -35,11 +33,19 @@ def process_audio(audio_path: str, spoken_language: str):
     translated = translator.translate(text, src_lang, tgt_lang)
     audio_out = tts.synthesize(translated, tts_lang)
 
-    save_conversation(spoken_language, text, translated)
-    store_voice(
-        audio_path=audio_path,
-        speaker="aditya",      
-        language=spoken_language
-    )
+    # 🔒 Non-blocking persistence
+    try:
+        save_conversation(spoken_language, text, translated)
+    except Exception as e:
+        print("⚠️ Conversation save failed:", e)
+
+    try:
+        store_voice(
+            audio_path=audio_path,
+            speaker="aditya",
+            language=spoken_language
+        )
+    except Exception as e:
+        print("⚠️ Voice store failed:", e)
 
     return text, translated, audio_out
