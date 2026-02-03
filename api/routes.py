@@ -22,13 +22,13 @@ def process_audio(audio_path: str, spoken_language: str):
         raise ValueError("ASR returned empty text")
 
     if spoken_language == "english":
-        src_lang = NLLB_LANG_MAP["english"]
-        tgt_lang = NLLB_LANG_MAP["hindi"]
-        tts_lang = MMS_TTS_LANGUAGES["hindi"]
+        src_lang = "eng_Latn"
+        tgt_lang = "hin_Deva"
+        tts_lang = "hin"
     else:
-        src_lang = NLLB_LANG_MAP["hindi"]
-        tgt_lang = NLLB_LANG_MAP["english"]
-        tts_lang = MMS_TTS_LANGUAGES["english"]
+        src_lang = "hin_Deva"
+        tgt_lang = "eng_Latn"
+        tts_lang = "eng"
 
     translated = translator.translate(text, src_lang, tgt_lang)
     try:
