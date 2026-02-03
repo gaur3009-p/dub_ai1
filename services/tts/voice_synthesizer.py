@@ -1,46 +1,37 @@
-import re
-import torch
-import soundfile as sf
 import uuid
-from transformers import VitsModel, AutoTokenizer
+import soundfile as sf
+from transformers import pipeline
 from config.settings import MMS_TTS_BASE, MMS_TTS_LANGUAGES
 
 class VoiceSynthesizer:
     def __init__(self):
-        self.models = {}
-        self.tokenizers = {}
+        self.pipes = {}
 
-    def _load(self, lang: str):
-        if lang not in self.models:
+    def _load_pipe(self, lang: str):
+        if lang not in self.pipes:
             model_name = f"{MMS_TTS_BASE}-{lang}"
-            self.tokenizers[lang] = AutoTokenizer.from_pretrained(model_name)
-            self.models[lang] = VitsModel.from_pretrained(model_name)
-        return self.models[lang], self.tokenizers[lang]
-
-    def _clean_text(self, text: str) -> str:
-        text = text.strip()
-        text = re.sub(r"\s+", " ", text)
-        return text
+            self.pipes[lang] = pipeline(
+                task="text-to-speech",
+                model=model_name,
+            )
+        return self.pipes[lang]
 
     def synthesize(self, text: str, lang: str) -> str:
         if lang not in MMS_TTS_LANGUAGES.values():
             raise ValueError(f"Unsupported TTS language: {lang}")
 
-        text = self._clean_text(text)
+        text = text.strip()
         if not text:
             raise ValueError("TTS received empty text")
 
-        model, tokenizer = self._load(lang)
-        inputs = tokenizer(text, return_tensors="pt")
-
-        if inputs["input_ids"].shape[1] == 0:
-            raise ValueError("Tokenizer produced empty input_ids")
-
-        with torch.no_grad():
-            outputs = model(**inputs)
-            waveform = outputs.waveform
+        tts_pipe = self._load_pipe(lang)
+        output = tts_pipe(text)
 
         output_path = f"/tmp/{uuid.uuid4()}.wav"
-        sf.write(output_path, waveform.squeeze().cpu().numpy(), 16000)
+        sf.write(
+            output_path,
+            output["audio"],
+            output["sampling_rate"]
+        )
 
         return output_path
