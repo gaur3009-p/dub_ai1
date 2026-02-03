@@ -38,4 +38,4 @@ with gr.Blocks(title="DubYou – English ⇄ Hindi AI Dubbing") as app:
     )
 
 if __name__ == "__main__":
-    app.launch()
+    app.launch(share = True)
