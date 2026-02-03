@@ -13,25 +13,30 @@ translator = NLLBTranslator(NLLB_MODEL)
 tts = VoiceSynthesizer()
 
 def process_audio(audio_path: str, spoken_language: str):
+    # 1️⃣ ASR
     asr_lang = SUPPORTED_ASR_LANGS[spoken_language]
     text = asr.transcribe(audio_path, asr_lang)
 
-    # 🚨 Guard: ASR produced nothing
     if not text or not text.strip():
         raise ValueError("ASR returned empty text")
 
+    # 2️⃣ Decide translation direction
     if spoken_language == "english":
-        src, tgt = NLLB_LANG_MAP["english"], NLLB_LANG_MAP["hindi"]
+        src_lang = NLLB_LANG_MAP["english"]
+        tgt_lang = NLLB_LANG_MAP["hindi"]
         tts_lang = MMS_TTS_LANGUAGES["hindi"]
     else:
-        src, tgt = NLLB_LANG_MAP["hindi"], NLLB_LANG_MAP["english"]
+        src_lang = NLLB_LANG_MAP["hindi"]
+        tgt_lang = NLLB_LANG_MAP["english"]
         tts_lang = MMS_TTS_LANGUAGES["english"]
 
-    translated = translator.translate(text, src, tgt)
+    # 3️⃣ TRANSLATION (this was broken earlier)
+    translated = translator.translate(text, src_lang, tgt_lang)
 
-    # 🚨 Guard: Translation produced nothing
     if not translated or not translated.strip():
         raise ValueError("Translation returned empty text")
 
+    # 4️⃣ TTS (NOT voice cloning – generic voice)
     audio_out = tts.synthesize(translated, tts_lang)
+
     return text, translated, audio_out
