@@ -31,9 +31,12 @@ def process_audio(audio_path: str, spoken_language: str):
         tts_lang = MMS_TTS_LANGUAGES["english"]
 
     translated = translator.translate(text, src_lang, tgt_lang)
-    audio_out = tts.synthesize(translated, tts_lang)
-
-    # 🔒 Non-blocking persistence
+    try:
+        audio_out = tts.synthesize(translated, tts_lang)
+    except Exception as e:
+        print("⚠️ TTS failed:", e)
+        audio_out = None
+    
     try:
         save_conversation(spoken_language, text, translated)
     except Exception as e:
