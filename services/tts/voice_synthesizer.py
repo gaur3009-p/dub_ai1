@@ -1,5 +1,6 @@
 import uuid
 import re
+import numpy as np
 import soundfile as sf
 from transformers import pipeline
 from config.settings import MMS_TTS_BASE, MMS_TTS_LANGUAGES
@@ -21,10 +22,10 @@ class VoiceSynthesizer:
     def _sanitize_text(self, text: str) -> str:
         text = text.strip()
 
-        # Remove non-speakable characters
+        # Allow English + Devanagari + basic punctuation
         text = re.sub(r"[^\w\s\u0900-\u097F.,?!]", "", text)
 
-        # Collapse spaces
+        # Collapse multiple spaces
         text = re.sub(r"\s+", " ", text)
 
         return text
@@ -35,18 +36,31 @@ class VoiceSynthesizer:
 
         text = self._sanitize_text(text)
 
-        # 🚨 CRITICAL: MMS cannot handle very short text
+        # 🚨 MMS-TTS cannot handle very short / fragment text
         if len(text) < 3:
             raise ValueError("TTS text too short after sanitization")
 
         tts_pipe = self._load_pipe(lang)
         output = tts_pipe(text)
 
+        audio = output["audio"]
+        sr = output["sampling_rate"]
+
+        # 🔒 Ensure numpy float32 for soundfile
+        if not isinstance(audio, np.ndarray):
+            audio = np.array(audio, dtype=np.float32)
+        else:
+            audio = audio.astype(np.float32)
+
         output_path = f"/tmp/{uuid.uuid4()}.wav"
+
+        # 🔥 Explicit WAV format to avoid corruption
         sf.write(
             output_path,
-            output["audio"],
-            output["sampling_rate"]
+            audio,
+            sr,
+            format="WAV",
+            subtype="PCM_16"
         )
 
         return output_path
