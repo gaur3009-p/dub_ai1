@@ -1,7 +1,9 @@
 gradio
 torch
+torchaudio
 openai-whisper
 transformers
+accelerate
 sentencepiece
 soundfile
 librosa
