@@ -51,7 +51,7 @@ QDRANT = {
 # ========================
 # ASR (Whisper)
 # ========================
-WHISPER_MODEL = "base"
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 
 SUPPORTED_ASR_LANGS = {
     "english": "en",
@@ -61,7 +61,10 @@ SUPPORTED_ASR_LANGS = {
 # ========================
 # NLLB TRANSLATION
 # ========================
-NLLB_MODEL = "facebook/nllb-200-distilled-600M"
+NLLB_MODEL = os.getenv(
+    "NLLB_MODEL",
+    "facebook/nllb-200-distilled-600M"
+)
 
 NLLB_LANG_MAP = {
     "english": "eng_Latn",
@@ -69,13 +72,22 @@ NLLB_LANG_MAP = {
 }
 
 # ========================
-# MMS – MULTILINGUAL TTS
+# VOICE CLONING (XTTS)
 # ========================
-MMS_TTS_BASE = "facebook/mms-tts"
+XTTS_MODEL_NAME = os.getenv(
+    "XTTS_MODEL_NAME",
+    "coqui/XTTS-v2"
+)
 
-MMS_TTS_LANGUAGES = {
-    "english": "eng",
-    "hindi": "hin",
+XTTS_LANGUAGES = {
+    "english": "en",
+    "hindi": "hi",
+    "french": "fr",
+    "spanish": "es",
 }
 
-DEFAULT_TTS_LANG = "eng"
+# ========================
+# AUDIO
+# ========================
+AUDIO_SAMPLE_RATE = 16000
+TTS_OUTPUT_SAMPLE_RATE = 24000
