@@ -1,9 +1,8 @@
 from services.asr.whisper_asr import WhisperASR
 from services.translation.nllb_translator import NLLBTranslator
-from services.tts.voice_synthesizer import VoiceSynthesizer
+from services.tts.xtts_synthesizer import XTTSVoiceCloner
 from config.settings import (
     SUPPORTED_ASR_LANGS,
-    NLLB_LANG_MAP,
     NLLB_MODEL
 )
 from services.database.conversation_repo import save_conversation
@@ -11,7 +10,7 @@ from services.database.qdrant_client import qdrant_client, COLLECTION_NAME
 
 asr = WhisperASR()
 translator = NLLBTranslator(NLLB_MODEL)
-tts = VoiceSynthesizer()
+tts = XTTSVoiceCloner()
 
 
 def _get_speaker_embedding(speaker: str):
@@ -20,13 +19,15 @@ def _get_speaker_embedding(speaker: str):
     """
     search_result = qdrant_client.search(
         collection_name=COLLECTION_NAME,
-        query_vector=[0.0] * 40,  # dummy vector for payload-only search
+        query_vector=[0.0] * 512,  # dummy vector, size not used for lookup
         limit=1,
         with_payload=True
     )
 
     if not search_result:
-        raise RuntimeError("Speaker not enrolled. Please enroll voice first.")
+        raise RuntimeError(
+            "Speaker not enrolled. Please enroll voice first."
+        )
 
     return search_result[0].vector
 
@@ -59,15 +60,19 @@ def process_audio(audio_path: str, spoken_language: str):
         print("⚠️ Speaker fetch failed:", e)
         speaker_embedding = None
 
-    # ---------------- Voice Cloning TTS ----------------
+    # ---------------- Voice Cloning (XTTS) ----------------
     try:
         audio_out = (
-            tts.synthesize(translated, speaker_embedding, tts_lang)
+            tts.synthesize(
+                text=translated,
+                speaker_embedding=speaker_embedding,
+                language=tts_lang
+            )
             if speaker_embedding is not None
             else None
         )
     except Exception as e:
-        print("⚠️ TTS failed:", e)
+        print("⚠️ XTTS failed:", e)
         audio_out = None
 
     # ---------------- Save Conversation ----------------
