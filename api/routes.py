@@ -4,7 +4,6 @@ from services.tts.bark_cloner import BarkVoiceCloner
 from config.settings import SUPPORTED_ASR_LANGS, NLLB_MODEL
 from services.database.conversation_repo import save_conversation
 from services.database.qdrant_client import qdrant_client, COLLECTION_NAME
-
 asr = WhisperASR()
 translator = NLLBTranslator(NLLB_MODEL)
 tts = BarkVoiceCloner()
