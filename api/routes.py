@@ -1,76 +1,71 @@
+import requests
 from services.asr.whisper_asr import WhisperASR
 from services.translation.nllb_translator import NLLBTranslator
-from services.tts.bark_cloner import BarkVoiceCloner
-from config.settings import SUPPORTED_ASR_LANGS, NLLB_MODEL
 from services.database.conversation_repo import save_conversation
-from services.database.qdrant_client import qdrant_client, COLLECTION_NAME
+from config.settings import (
+    SUPPORTED_ASR_LANGS,
+    NLLB_MODEL,
+    VOICE_SERVICE_URL
+)
+
 asr = WhisperASR()
 translator = NLLBTranslator(NLLB_MODEL)
-tts = BarkVoiceCloner()
 
 
-def _get_speaker_audio(speaker: str):
-    """
-    Fetch latest enrolled speaker audio from Qdrant
-    """
-    results = qdrant_client.scroll(
-        collection_name=COLLECTION_NAME,
-        limit=1,
-        with_payload=True
-    )[0]
+def enroll_voice_http(audio_path: str, speaker: str):
+    with open(audio_path, "rb") as f:
+        requests.post(
+            f"{VOICE_SERVICE_URL}/enroll",
+            params={"speaker": speaker},
+            files={"audio": f},
+            timeout=60
+        )
 
-    if not results:
-        raise RuntimeError("Speaker not enrolled")
 
-    return results[0].payload["audio_path"]
+def synthesize_http(text: str, speaker: str, language: str):
+    r = requests.post(
+        f"{VOICE_SERVICE_URL}/synthesize",
+        params={
+            "speaker": speaker,
+            "text": text,
+            "language": language
+        },
+        timeout=120
+    )
+    r.raise_for_status()
+    return r.json()["audio_path"]
 
 
 def process_audio(audio_path: str, spoken_language: str):
-    # ---------- ASR ----------
-    asr_lang = SUPPORTED_ASR_LANGS[spoken_language]
-    text = asr.transcribe(audio_path, asr_lang)
+    # -------- ASR --------
+    text = asr.transcribe(
+        audio_path,
+        SUPPORTED_ASR_LANGS[spoken_language]
+    )
 
-    if not text or not text.strip():
-        raise ValueError("ASR returned empty text")
+    if not text.strip():
+        raise ValueError("Empty ASR output")
 
-    # ---------- Language Routing ----------
+    # -------- ROUTING --------
     if spoken_language == "english":
-        src_lang = "eng_Latn"
-        tgt_lang = "hin_Deva"
-        tts_lang = "hi"
+        src_lang, tgt_lang, tts_lang = "eng_Latn", "hin_Deva", "hi"
     else:
-        src_lang = "hin_Deva"
-        tgt_lang = "eng_Latn"
-        tts_lang = "en"
+        src_lang, tgt_lang, tts_lang = "hin_Deva", "eng_Latn", "en"
 
-    # ---------- Translation ----------
+    # -------- TRANSLATION --------
     translated = translator.translate(text, src_lang, tgt_lang)
 
-    # ---------- Fetch Voice ----------
-    try:
-        speaker_audio = _get_speaker_audio("aditya")
-    except Exception as e:
-        print("⚠️ Voice not enrolled:", e)
-        speaker_audio = None
+    # -------- VOICE CLONING --------
+    audio_out = synthesize_http(
+        translated,
+        speaker="aditya",
+        language=tts_lang
+    )
 
-    # ---------- Bark Voice Cloning ----------
-    try:
-        audio_out = (
-            tts.synthesize(
-                text=translated,
-                history_prompt=speaker_audio,
-                language=tts_lang
-            )
-            if speaker_audio else None
-        )
-    except Exception as e:
-        print("⚠️ Bark TTS failed:", e)
-        audio_out = None
-
-    # ---------- Save Conversation ----------
+    # -------- SAVE --------
     try:
         save_conversation(spoken_language, text, translated)
-    except Exception as e:
-        print("⚠️ Conversation save failed:", e)
+    except Exception:
+        pass
 
     return text, translated, audio_out
