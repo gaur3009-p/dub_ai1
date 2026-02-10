@@ -72,14 +72,9 @@ NLLB_LANG_MAP = {
 }
 
 # ========================
-# VOICE CLONING (XTTS)
+# VOICE CLONING (BARK)
 # ========================
-XTTS_MODEL_NAME = os.getenv(
-    "XTTS_MODEL_NAME",
-    "coqui/XTTS-v2"
-)
-
-XTTS_LANGUAGES = {
+BARK_LANGUAGES = {
     "english": "en",
     "hindi": "hi",
     "french": "fr",
@@ -90,4 +85,4 @@ XTTS_LANGUAGES = {
 # AUDIO
 # ========================
 AUDIO_SAMPLE_RATE = 16000
-TTS_OUTPUT_SAMPLE_RATE = 24000
+BARK_OUTPUT_SAMPLE_RATE = 24000
