@@ -1,9 +1,6 @@
-gradio
 torch
-torchaudio
 openai-whisper
 transformers
-accelerate
 sentencepiece
 soundfile
 librosa
@@ -12,3 +9,6 @@ psycopg2-binary
 redis
 qdrant-client
 python-dotenv
+gradio
+bark-audio
+einops
