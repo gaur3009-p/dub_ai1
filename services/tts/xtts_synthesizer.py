@@ -4,7 +4,6 @@ import soundfile as sf
 from TTS.tts.models.xtts import Xtts
 from TTS.tts.configs.xtts_config import XttsConfig
 
-
 class XTTSVoiceCloner:
     def __init__(self):
         config = XttsConfig()
