@@ -1,23 +1,32 @@
 import uuid
 import torch
 import soundfile as sf
-from transformers import AutoModel, AutoProcessor
+from TTS.tts.models.xtts import Xtts
+from TTS.tts.configs.xtts_config import XttsConfig
+
 
 class XTTSVoiceCloner:
     def __init__(self):
-        self.processor = AutoProcessor.from_pretrained("coqui/XTTS-v2")
-        self.model = AutoModel.from_pretrained(
-            "coqui/XTTS-v2",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto"
+        config = XttsConfig()
+        config.load_json("tts_models/multilingual/multi-dataset/xtts_v2/config.json")
+
+        self.model = Xtts.init_from_config(config)
+        self.model.load_checkpoint(
+            config,
+            checkpoint_path="tts_models/multilingual/multi-dataset/xtts_v2/model.pth",
+            vocab_path="tts_models/multilingual/multi-dataset/xtts_v2/vocab.json",
+            speaker_file_path="tts_models/multilingual/multi-dataset/xtts_v2/speakers_xtts.pth",
         )
+
+        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()
+        self.model.eval()
 
     def synthesize(self, text: str, speaker_embedding, language: str) -> str:
         with torch.no_grad():
-            audio = self.model.generate(
+            audio = self.model.inference(
                 text=text,
-                speaker_embedding=speaker_embedding,
-                language=language
+                language=language,
+                speaker_embedding=torch.tensor(speaker_embedding).unsqueeze(0)
             )
 
         output_path = f"/tmp/{uuid.uuid4()}.wav"
