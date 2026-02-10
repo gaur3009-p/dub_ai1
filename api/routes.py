@@ -1,46 +1,40 @@
 from services.asr.whisper_asr import WhisperASR
 from services.translation.nllb_translator import NLLBTranslator
-from services.tts.xtts_synthesizer import XTTSVoiceCloner
-from config.settings import (
-    SUPPORTED_ASR_LANGS,
-    NLLB_MODEL
-)
+from services.tts.bark_cloner import BarkVoiceCloner
+from config.settings import SUPPORTED_ASR_LANGS, NLLB_MODEL
 from services.database.conversation_repo import save_conversation
 from services.database.qdrant_client import qdrant_client, COLLECTION_NAME
 
 asr = WhisperASR()
 translator = NLLBTranslator(NLLB_MODEL)
-tts = XTTSVoiceCloner()
+tts = BarkVoiceCloner()
 
 
-def _get_speaker_embedding(speaker: str):
+def _get_speaker_audio(speaker: str):
     """
-    Fetch latest enrolled speaker embedding from Qdrant
+    Fetch latest enrolled speaker audio from Qdrant
     """
-    search_result = qdrant_client.search(
+    results = qdrant_client.scroll(
         collection_name=COLLECTION_NAME,
-        query_vector=[0.0] * 512,  # dummy vector, size not used for lookup
         limit=1,
         with_payload=True
-    )
+    )[0]
 
-    if not search_result:
-        raise RuntimeError(
-            "Speaker not enrolled. Please enroll voice first."
-        )
+    if not results:
+        raise RuntimeError("Speaker not enrolled")
 
-    return search_result[0].vector
+    return results[0].payload["audio_path"]
 
 
 def process_audio(audio_path: str, spoken_language: str):
-    # ---------------- ASR ----------------
+    # ---------- ASR ----------
     asr_lang = SUPPORTED_ASR_LANGS[spoken_language]
     text = asr.transcribe(audio_path, asr_lang)
 
     if not text or not text.strip():
         raise ValueError("ASR returned empty text")
 
-    # ---------------- Language Routing ----------------
+    # ---------- Language Routing ----------
     if spoken_language == "english":
         src_lang = "eng_Latn"
         tgt_lang = "hin_Deva"
@@ -50,32 +44,31 @@ def process_audio(audio_path: str, spoken_language: str):
         tgt_lang = "eng_Latn"
         tts_lang = "en"
 
-    # ---------------- Translation ----------------
+    # ---------- Translation ----------
     translated = translator.translate(text, src_lang, tgt_lang)
 
-    # ---------------- Speaker Embedding ----------------
+    # ---------- Fetch Voice ----------
     try:
-        speaker_embedding = _get_speaker_embedding("aditya")
+        speaker_audio = _get_speaker_audio("aditya")
     except Exception as e:
-        print("⚠️ Speaker fetch failed:", e)
-        speaker_embedding = None
+        print("⚠️ Voice not enrolled:", e)
+        speaker_audio = None
 
-    # ---------------- Voice Cloning (XTTS) ----------------
+    # ---------- Bark Voice Cloning ----------
     try:
         audio_out = (
             tts.synthesize(
                 text=translated,
-                speaker_embedding=speaker_embedding,
+                history_prompt=speaker_audio,
                 language=tts_lang
             )
-            if speaker_embedding is not None
-            else None
+            if speaker_audio else None
         )
     except Exception as e:
-        print("⚠️ XTTS failed:", e)
+        print("⚠️ Bark TTS failed:", e)
         audio_out = None
 
-    # ---------------- Save Conversation ----------------
+    # ---------- Save Conversation ----------
     try:
         save_conversation(spoken_language, text, translated)
     except Exception as e:
