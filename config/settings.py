@@ -1,88 +1,57 @@
-import os
-from urllib.parse import urlparse
+from fastapi import FastAPI, UploadFile
+import tempfile
+import soundfile as sf
+import torch
+from TTS.tts.models.xtts import Xtts
+from TTS.tts.configs.xtts_config import XttsConfig
 
-# ========================
-# GENERAL
-# ========================
-APP_NAME = "DubYou"
-ENV = os.getenv("ENV", "dev")
+app = FastAPI()
 
-# ========================
-# POSTGRES (NeonDB)
-# ========================
-NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL")
+# -----------------------------
+# Load XTTS once (GPU)
+# -----------------------------
+config = XttsConfig()
+config.load_json("tts_models/multilingual/multi-dataset/xtts_v2/config.json")
 
-POSTGRES_ENABLED = False
-POSTGRES = {}
-
-if NEON_DATABASE_URL:
-    parsed = urlparse(NEON_DATABASE_URL)
-    POSTGRES = {
-        "host": parsed.hostname,
-        "port": parsed.port or 5432,
-        "db": parsed.path.lstrip("/"),
-        "user": parsed.username,
-        "password": parsed.password,
-        "sslmode": "require",
-    }
-    POSTGRES_ENABLED = True
-
-# ========================
-# REDIS (Redis Cloud)
-# ========================
-REDIS = {
-    "host": os.getenv("REDIS_HOST"),
-    "port": int(os.getenv("REDIS_PORT", 6379)),
-    "username": os.getenv("REDIS_USERNAME", "default"),
-    "password": os.getenv("REDIS_PASSWORD"),
-    "db": 0,
-    "ssl": True,
-}
-
-# ========================
-# QDRANT (Cloud)
-# ========================
-QDRANT = {
-    "url": os.getenv("QDRANT_URL"),
-    "api_key": os.getenv("QDRANT_API_KEY"),
-    "collection": os.getenv("QDRANT_COLLECTION", "voice_embeddings"),
-}
-
-# ========================
-# ASR (Whisper)
-# ========================
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
-
-SUPPORTED_ASR_LANGS = {
-    "english": "en",
-    "hindi": "hi",
-}
-
-# ========================
-# NLLB TRANSLATION
-# ========================
-NLLB_MODEL = os.getenv(
-    "NLLB_MODEL",
-    "facebook/nllb-200-distilled-600M"
+model = Xtts.init_from_config(config)
+model.load_checkpoint(
+    config,
+    checkpoint_path="tts_models/multilingual/multi-dataset/xtts_v2/model.pth",
+    vocab_path="tts_models/multilingual/multi-dataset/xtts_v2/vocab.json",
+    speaker_file_path="tts_models/multilingual/multi-dataset/xtts_v2/speakers_xtts.pth",
 )
 
-NLLB_LANG_MAP = {
-    "english": "eng_Latn",
-    "hindi": "hin_Deva",
-}
+model.cuda()
+model.eval()
 
-# ========================
-# VOICE CLONING (BARK)
-# ========================
-BARK_LANGUAGES = {
-    "english": "en",
-    "hindi": "hi",
-    "french": "fr",
-    "spanish": "es",
-}
+SPEAKERS = {}  # in-memory speaker store
 
-# ========================
-# AUDIO
-# ========================
-AUDIO_SAMPLE_RATE = 16000
-BARK_OUTPUT_SAMPLE_RATE = 24000
+
+@app.post("/enroll")
+async def enroll(speaker: str, audio: UploadFile):
+    wav, sr = sf.read(audio.file)
+    wav = torch.tensor(wav).unsqueeze(0).cuda()
+
+    emb = model.get_speaker_embedding(wav)
+    SPEAKERS[speaker] = emb
+
+    return {"status": "enrolled"}
+
+
+@app.post("/synthesize")
+async def synthesize(speaker: str, text: str, language: str):
+    emb = SPEAKERS.get(speaker)
+    if emb is None:
+        return {"error": "Speaker not enrolled"}
+
+    with torch.no_grad():
+        audio = model.inference(
+            text=text,
+            language=language,
+            speaker_embedding=emb
+        )
+
+    out = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    sf.write(out.name, audio, 24000)
+
+    return {"audio_path": out.name}
