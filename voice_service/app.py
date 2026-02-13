@@ -1,9 +1,15 @@
 import os
 os.environ["COQUI_TOS_AGREED"] = "1"
 
+import torch
+from torch.serialization import add_safe_globals
+
+# 🔥 Allow XTTS config class for torch.load
+from TTS.tts.configs.xtts_config import XttsConfig
+add_safe_globals([XttsConfig])
+
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import JSONResponse
-import torch
 import tempfile
 from TTS.api import TTS
 
