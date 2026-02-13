@@ -1,28 +1,23 @@
+import os
+os.environ["COQUI_TOS_AGREED"] = "1"
+
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import JSONResponse
 import torch
 import tempfile
-import soundfile as sf
 from TTS.api import TTS
 
 app = FastAPI()
 
-# -----------------------------
-# Load XTTS v2 properly
-# -----------------------------
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 print("🚀 Loading XTTS v2...")
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 print("✅ XTTS Loaded Successfully")
 
-# Store speaker embeddings in memory
 SPEAKERS = {}
 
 
-# -----------------------------
-# Voice Enrollment
-# -----------------------------
 @app.post("/enroll")
 async def enroll(
     speaker: str = Form(...),
@@ -31,12 +26,10 @@ async def enroll(
     if audio is None:
         return JSONResponse({"error": "No audio file provided"}, status_code=400)
 
-    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(await audio.read())
         temp_path = tmp.name
 
-    # Extract speaker embedding
     try:
         embedding = tts.get_speaker_embedding(temp_path)
         SPEAKERS[speaker] = embedding
@@ -46,9 +39,6 @@ async def enroll(
     return {"status": f"Speaker '{speaker}' enrolled successfully"}
 
 
-# -----------------------------
-# Voice Cloning / Synthesis
-# -----------------------------
 @app.post("/synthesize")
 async def synthesize(
     speaker: str = Form(...),
@@ -63,7 +53,6 @@ async def synthesize(
             status_code=400
         )
 
-    # Generate audio file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         output_path = tmp.name
 
