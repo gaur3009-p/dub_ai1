@@ -1,47 +1,80 @@
-from fastapi import FastAPI, UploadFile
-import torch, tempfile
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import JSONResponse
+import torch
+import tempfile
 import soundfile as sf
-from TTS.tts.models.xtts import Xtts
-from TTS.tts.configs.xtts_config import XttsConfig
+from TTS.api import TTS
 
 app = FastAPI()
 
-config = XttsConfig()
-config.load_json("tts_models/multilingual/multi-dataset/xtts_v2/config.json")
+# -----------------------------
+# Load XTTS v2 properly
+# -----------------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model = Xtts.init_from_config(config)
-model.load_checkpoint(
-    config,
-    checkpoint_path="tts_models/multilingual/multi-dataset/xtts_v2/model.pth",
-    vocab_path="tts_models/multilingual/multi-dataset/xtts_v2/vocab.json",
-    speaker_file_path="tts_models/multilingual/multi-dataset/xtts_v2/speakers_xtts.pth",
-)
+print("🚀 Loading XTTS v2...")
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+print("✅ XTTS Loaded Successfully")
 
-model.cuda()
-model.eval()
-
+# Store speaker embeddings in memory
 SPEAKERS = {}
 
+
+# -----------------------------
+# Voice Enrollment
+# -----------------------------
 @app.post("/enroll")
-async def enroll(speaker: str, audio: UploadFile):
-    wav, _ = sf.read(audio.file)
-    wav = torch.tensor(wav).unsqueeze(0).cuda()
-    SPEAKERS[speaker] = model.get_speaker_embedding(wav)
-    return {"status": "enrolled"}
+async def enroll(
+    speaker: str = Form(...),
+    audio: UploadFile = None
+):
+    if audio is None:
+        return JSONResponse({"error": "No audio file provided"}, status_code=400)
 
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        tmp.write(await audio.read())
+        temp_path = tmp.name
+
+    # Extract speaker embedding
+    try:
+        embedding = tts.get_speaker_embedding(temp_path)
+        SPEAKERS[speaker] = embedding
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    return {"status": f"Speaker '{speaker}' enrolled successfully"}
+
+
+# -----------------------------
+# Voice Cloning / Synthesis
+# -----------------------------
 @app.post("/synthesize")
-async def synthesize(speaker: str, text: str, language: str):
+async def synthesize(
+    speaker: str = Form(...),
+    text: str = Form(...),
+    language: str = Form(...)
+):
     emb = SPEAKERS.get(speaker)
-    if emb is None:
-        return {"error": "Speaker not enrolled"}
 
-    with torch.no_grad():
-        audio = model.inference(
-            text=text,
-            language=language,
-            speaker_embedding=emb
+    if emb is None:
+        return JSONResponse(
+            {"error": "Speaker not enrolled"},
+            status_code=400
         )
 
-    f = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    sf.write(f.name, audio, 24000)
-    return {"audio_path": f.name}
+    # Generate audio file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        output_path = tmp.name
+
+    try:
+        tts.tts_to_file(
+            text=text,
+            speaker_embedding=emb,
+            language=language,
+            file_path=output_path
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    return {"audio_path": output_path}
