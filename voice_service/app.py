@@ -1,17 +1,9 @@
 import os
 os.environ["COQUI_TOS_AGREED"] = "1"
 
-import torch
-from torch.serialization import add_safe_globals
-
-# Allow XTTS classes for PyTorch 2.6+
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import XttsAudioConfig
-
-add_safe_globals([XttsConfig, XttsAudioConfig])
-
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import JSONResponse
+import torch
 import tempfile
 from TTS.api import TTS
 
@@ -38,11 +30,8 @@ async def enroll(
         tmp.write(await audio.read())
         temp_path = tmp.name
 
-    try:
-        embedding = tts.get_speaker_embedding(temp_path)
-        SPEAKERS[speaker] = embedding
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    embedding = tts.get_speaker_embedding(temp_path)
+    SPEAKERS[speaker] = embedding
 
     return {"status": f"Speaker '{speaker}' enrolled successfully"}
 
@@ -64,14 +53,11 @@ async def synthesize(
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         output_path = tmp.name
 
-    try:
-        tts.tts_to_file(
-            text=text,
-            speaker_embedding=emb,
-            language=language,
-            file_path=output_path
-        )
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    tts.tts_to_file(
+        text=text,
+        speaker_embedding=emb,
+        language=language,
+        file_path=output_path
+    )
 
     return {"audio_path": output_path}
