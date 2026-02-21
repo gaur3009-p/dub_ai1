@@ -1,37 +1,58 @@
 import gradio as gr
-from api.routes import process_audio, enroll_voice_http
+import requests
+from services.pipeline import process_audio
+
+VOICE_URL = "http://localhost:8001"
 
 def enroll(audio_path):
-    enroll_voice_http(audio_path, speaker="aditya")
-    return "✅ Voice enrolled successfully"
+    with open(audio_path, "rb") as f:
+        requests.post(
+            f"{VOICE_URL}/enroll",
+            data={"speaker": "aditya"},
+            files={"audio": f}
+        )
+    return "Voice enrolled"
 
-def pipeline(audio_path, spoken_language):
-    if not audio_path:
-        return "", "", None
-    return process_audio(audio_path, spoken_language)
+def run(audio_path, lang):
 
-with gr.Blocks(title="DubYou") as app:
-    gr.Markdown("# 🎙️ DubYou – AI Voice Cloning (Microservice)")
+    text, translated = process_audio(audio_path, lang)
 
-    gr.Markdown("## 🧬 Phase 0: Voice Enrollment")
+    r = requests.post(
+        f"{VOICE_URL}/synthesize",
+        data={
+            "speaker": "aditya",
+            "text": translated,
+            "language": "hi"
+        }
+    )
+
+    return text, translated, r.json()["audio_path"]
+
+
+with gr.Blocks() as app:
+
+    gr.Markdown("# DubYou Real-Time Translator")
+
     enroll_audio = gr.Audio(type="filepath")
-    enroll_btn = gr.Button("Enroll Voice")
+    enroll_btn = gr.Button("Enroll")
     enroll_status = gr.Textbox()
 
     enroll_btn.click(enroll, enroll_audio, enroll_status)
 
     gr.Markdown("---")
-    gr.Markdown("## 🎧 Translate & Dub")
 
     audio = gr.Audio(type="filepath")
-    lang = gr.Radio(["english", "hindi"], value="english")
+    lang = gr.Dropdown(list({
+        "english","hindi","bengali","tamil",
+        "telugu","marathi","gujarati"
+    }))
 
-    run = gr.Button("Translate & Dub")
-    out1 = gr.Textbox(label="Recognized")
-    out2 = gr.Textbox(label="Translated")
-    out3 = gr.Audio(label="Dubbed", autoplay=True)
+    btn = gr.Button("Translate")
 
-    run.click(pipeline, [audio, lang], [out1, out2, out3])
+    t1 = gr.Textbox(label="Recognized")
+    t2 = gr.Textbox(label="Translated")
+    out = gr.Audio(label="Dubbed")
 
-if __name__ == "__main__":
-    app.launch(share=True)
+    btn.click(run, [audio, lang], [t1, t2, out])
+
+app.launch()
