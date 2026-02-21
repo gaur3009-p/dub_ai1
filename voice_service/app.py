@@ -1,63 +1,64 @@
 import os
 os.environ["COQUI_TOS_AGREED"] = "1"
 
-from fastapi import FastAPI, UploadFile, Form
-from fastapi.responses import JSONResponse
 import torch
-import tempfile
+import asyncio
+from fastapi import FastAPI
+from aiortc import RTCPeerConnection, RTCSessionDescription
 from TTS.api import TTS
+import whisper
+import tempfile
 
 app = FastAPI()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-print("🚀 Loading XTTS v2...")
+# Load models once
+whisper_model = whisper.load_model("base")
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
-print("✅ XTTS Loaded Successfully")
 
 SPEAKERS = {}
+pcs = set()
 
+@app.post("/offer")
+async def offer(request: dict):
+    pc = RTCPeerConnection()
+    pcs.add(pc)
 
-@app.post("/enroll")
-async def enroll(
-    speaker: str = Form(...),
-    audio: UploadFile = None
-):
-    if audio is None:
-        return JSONResponse({"error": "No audio file provided"}, status_code=400)
+    @pc.on("track")
+    async def on_track(track):
+        if track.kind == "audio":
+            while True:
+                frame = await track.recv()
+                # Convert frame to wav chunk
+                with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+                    tmp.write(frame.to_bytes())
+                    tmp.flush()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(await audio.read())
-        temp_path = tmp.name
+                    # Streaming ASR
+                    result = whisper_model.transcribe(tmp.name)
+                    text = result["text"]
 
-    embedding = tts.get_speaker_embedding(temp_path)
-    SPEAKERS[speaker] = embedding
+                    # Translate here (NLLB call)
+                    translated = text  # placeholder
 
-    return {"status": f"Speaker '{speaker}' enrolled successfully"}
+                    # TTS
+                    output_path = "/tmp/out.wav"
+                    tts.tts_to_file(
+                        text=translated,
+                        speaker_embedding=SPEAKERS["aditya"],
+                        language="hi",
+                        file_path=output_path
+                    )
 
-
-@app.post("/synthesize")
-async def synthesize(
-    speaker: str = Form(...),
-    text: str = Form(...),
-    language: str = Form(...)
-):
-    emb = SPEAKERS.get(speaker)
-
-    if emb is None:
-        return JSONResponse(
-            {"error": "Speaker not enrolled"},
-            status_code=400
-        )
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        output_path = tmp.name
-
-    tts.tts_to_file(
-        text=text,
-        speaker_embedding=emb,
-        language=language,
-        file_path=output_path
+    await pc.setRemoteDescription(
+        RTCSessionDescription(sdp=request["sdp"], type=request["type"])
     )
 
-    return {"audio_path": output_path}
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+
+    return {
+        "sdp": pc.localDescription.sdp,
+        "type": pc.localDescription.type
+    }
